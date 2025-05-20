@@ -58,7 +58,7 @@ INSERT INTO buytbl VALUES(NULL, 'KBS', '운동화', NULL, 30, 2);
 INSERT INTO buytbl VALUES(NULL, 'KBS', '노트북', '전자', 1000, 1);
 
 -- 오류 발생 : userid 컬럼이 참조하는 usertbl테이블의 userID 컬럼에 'JYP'가 없음
-INSERT INTO buytbl VALUES(NULL, 'JYP', '모니터', '전자', 200, 1);
+# INSERT INTO buytbl VALUES(NULL, 'JYP', '모니터', '전자', 200, 1);
 
 
 -- 다음 컬럼을 가지는 usertbl을 정의하세요.
