@@ -1,0 +1,147 @@
+// 데이터베이스를 tutorial로 선정하세요
+use tutorial
+
+db.dropDatabase()
+
+// users 컬렉션에 username이 smith인 문서를 저장하세요
+
+db.users.insertOne({username: "smith"})
+
+// users 컬렉션에 username이 jones인 문서를 저장하세요
+db.users.insertOne({username: "jones"})
+
+// 앞에서 저장한 모든 문서를 출력하세요
+db.users.find()
+
+// 앞에서 저장한 문서 중 하나만 출력하세요
+db.users.findOne()
+
+// users 컬렉션에서 username이 "jones"인 문서를 찾아서 출력하세요
+db.users.findOne({username: "jones"})
+
+// users 컬렉션에서 username이 "jones" 또는 "smith"인 문서를 찾아서 출력하세요
+db.users.find({$or: [
+        {username: "jones"},
+        {username: "smith"}
+    ]})
+
+// users 컬렉션에서 username이 smith인 문서에 country 키가 Canada가 되도록 수정하세요
+db.users.updateOne({username: "smith"}, {$set: {country: "Canada"}})
+
+// 앞의 문서가 올바르게 수정되었는지 확인하세요
+db.users.find()
+
+
+// users 컬렉션에서 username이 smith인 문서를 {country: "Canada"}로 대체하고 확인하세요.
+db.users.replaceOne({username: "smith"}, {country: "Canada"})
+
+// 앞의 문서가 올바르게 수정되었는지 확인하세요
+db.users.find()
+
+
+// users 컬렉션에서 country가 Canada인 문서를 {username: "smith", country: "Canada"}로 대체하고 확인하세요.
+db.users.replaceOne({country: "Canada"}, {username: "smith", country: "Canada"})
+
+// users 컬렉션에서 username이 smith인 문서에서 country 키를 삭제하고, 삭제 여부를 확인하세요.
+db.users.updateOne({username: "smith"}, {$unset: {country: 1}})
+db.users.find()
+
+
+// db 전체 목록 출력
+show dbs
+
+// 현재 사용 중인 데이터베이스의 컬렉션 목록 출력
+show collections
+
+// 현재 사용 중인 데이터베이스와 users 컬렉션의 상태를 출력하세요
+db.runCommand({dbStats: 1})
+db.runCommand({collStats: "users"})
+
+// users 컬렉션에서 username이 smith인 문서를 삭제하고, 삭제 여부를 확인하세요.
+db.users.deleteMany({username: "smith"})
+db.users.find()
+
+// users 컬렉션의 모든 문서를 삭제하고, 삭제 여부를 확인하세요
+db.users.deleteMany({})
+db.users.find()
+
+// users 컬렉션을 삭제하세요
+db.users.drop()
+
+
+
+// 다음 형태의 문서 20000건을 추가하세요
+// - database: test
+use test
+
+// - collection: product
+// - 문서 필드:
+//   - num: 순번 (0부터 시작)
+//   - name: '스마트폰' + 순번
+db.product.drop()
+
+let docs = [];
+
+for (let i = 0; i < 20000; i++) {
+    docs.push({
+        num: i,
+        name: '스마트폰' + i
+    });
+
+    // 1000개씩 배치로 삽입 (메모리 효율성)
+    if (docs.length === 1000) {
+        db.product.insertMany(docs);
+        docs = [];
+    }
+}
+
+// 남아 있는 문서 삽입 (20000이 1000으로 나누어떨어지지 않는 경우 대비)
+if (docs.length > 0) {
+    db.product.insertMany(docs);
+}
+
+// product 컬렉션의 전체 문서 수를 출력하세요
+db.product.countDocuments()
+
+// product 컬렉션 문서를 num의 내림차순으로 정렬하여 출력하세요
+db.product.createIndex({num: -1})
+db.product.find().sort({ num: -1 });
+
+
+// product 컬렉션의 문서를 num의 내림차순으로 정렬하여 상위 10건을 출력하세요
+db.product.find()
+    .sort({ num: -1 })
+    .limit(10);
+
+
+// product 컬렉션의 문서를 num의 내림차순으로 정렬한 상태에서 다음을 처리하세요
+// - 한 페이지당 10건 출력
+// - 6페이지에 해당하는 문서를 출력하세요
+db.product.find()
+    .sort({ num: -1 })   // num 내림차순 정렬
+    .skip(50)            // (6페이지 - 1) * 10 = 50건 건너뜀
+    .limit(10);          // 10건 출력
+
+
+// product 컬렉션에서 num이 15미만이거나 19995 초과인 것을 출력하세요
+db.product.find({
+    $or: [
+        { num: { $lt: 15 } },
+        { num: { $gt: 19995 } }
+    ]
+});
+
+
+// product 컬렉션에서 name이 '스마트폰 10', '스마트폰 100', '스마트폰 1000' 중에 하나이면 출력하세요
+db.product.find({$or: [
+        {name: "스마트폰10"},
+        {name: "스마트폰100"},
+        {name: "스마트폰1000"}
+    ]})
+
+
+// product 컬렉션에서 num이 5보다 작은 문서를 출력하는데, name만 출력하세요. (_id 출력하면 안됨)
+db.product.find(
+    { num: { $lt: 5 } },    // 조건: num이 5보다 작음
+    { _id: 0, name: 1 }     // 출력: name만, _id는 제외
+);
