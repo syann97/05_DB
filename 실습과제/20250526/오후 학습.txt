@@ -1,0 +1,693 @@
+use my_database
+
+
+db.users.find()
+
+
+use tutorial2
+
+db.dropDatabase()
+
+db.users.insertOne({username: "smith"})
+
+db.users.insertMany([{username: "tom"}, {username: "jones"}])
+
+// 확인(조회)
+db.users.find()
+
+db.users.countDocuments()   // 도큐먼트(행) 개수 확인
+db.users.estimatedDocumentCount()   // 추정치 계산
+
+
+// 조건부 검색
+db.users.find({username: "jones"})
+
+// 빈 조건
+db.users.find()     // db.users.find({})와 동일
+
+
+
+// 논리 연산자 활용
+// AND
+// 기본 AND (암시적)
+db.users.find({_id : ObjectId("6833ee54c65900417966a601"), username : "smith"})
+
+// 명시적 AND
+db.users.find({$and: [
+        {_id : ObjectId("6833ee54c65900417966a601")},
+        {username : "smith"}
+    ]})
+
+
+
+// OR 연산자 사용
+db.users.find({
+    $or: [
+        {username: "smith"},
+        {username: "jones"}
+    ]
+})
+
+
+
+// update 관련
+
+// 신 버전
+db.users.updateOne({username: "smith"}, {$set: {country2: "Canada2"}})
+
+db.users.find()
+
+
+// unset: 필드 삭제
+db.users.updateOne({username: "smith"}, {$unset: {country2: 1}})
+
+db.users.find()
+
+
+// 도큐먼트 대체
+db.users.replaceOne({username: "smith"}, {country2: "Canada"})
+
+db.users.find()
+
+db.users.updateOne({country2: "Canada"}, {$set: {username: "smith", country2: "Canada"}})
+
+db.users.find()
+
+
+
+// 복잡한 데이터 업데이트
+db.users.updateOne({username: "smith"}, {
+    $set: {
+        favorites: {
+            cities: ["Chicago", "Cheyenne"],
+            movies: ["Casablanca", "For a Fow Dollars More", "The Sting"]
+        }
+    }
+})
+
+
+db.users.updateOne({username: "jones"},
+    {
+        $set: {
+            favorites: {
+                movies: ["Casablanca", "Rocky"]
+            }
+        }
+    })
+
+db.users.find();
+db.users.find({"favorites.movies": "Casablanca"}).pretty()  // favorites.move에 Casablanca가 있는 컬렉션만 출력
+
+
+// 배열 조작 연산자
+// $push: 배열에 무조건 추가(중복 가능)
+// $addToSet: 배열에 중복되지 않은 요소만 추가(중복 불가)
+
+// 신 버전 (MongoDB 3.2+) - 권장
+db.users.updateMany(
+    {"favorites.movies": "Casablanca"},
+    {$addToSet: {"favorites.movies": "The Maltese Falcon"}},
+    {upsert: false} // multi 옵션 불필요
+)
+
+db.users.find()
+// 1. favorites 객체 안의 movies 배열에 "Casablanca"가 포함된 도큐먼트 찾기
+// 2. favorites.movies 배열에 "The Maltese Falcon" 추가 (이미 있으면 추가 안함)
+// 3. upsert: false: 조건에 맞는 도큐먼트가 없어도 새로 생성하지 않음
+// 4. multi: true: 조건에 맞는 모든 도큐먼트를 수정
+
+
+// === 단일 업데이트 (신버전) ===
+db.users.updateOne(
+    {"favorites.movies": "Casablanca"},
+    {$push: {"favorites.movies": "Citizen Kane"}}
+)
+
+db.users.find()
+// 1. favorites 객체 안의 movies 배열에 "Casablanca"가 포함된 도큐먼트 찾기
+// -updateOne() 메서드이기 때문에 조건에 맞는 첫 번째 도큐먼트만 수정
+// 2. favorites.movies 배열에 "Citizen Kane" 추가 (중복 허용)
+
+
+
+// 데이터 삭제
+db.users.deleteOne({"favorites.cities": "Cheyenne"})    // 첫 번째 문서만 삭제
+db.users.deleteMany({"favorites.cities": "Cheyenne"})   // 조건에 맞는 모든 문서 삭제
+db.users.find()
+
+db.users.deleteMany({})   // 모든 문서 삭제 (컬렉션 유지)
+db.users.find()
+
+db.users.drop() // 버전 무관 - 컬렉션 자체 삭제
+db.users.find()
+
+
+// ---------------------------------------------------
+
+// 인덱스
+// 방법 2: 개별 삽입 (호환성 우선시)
+for(let i = 0; i < 20000; i++) {
+    db.numbers.insertOne({num: i});
+}
+
+// 도큐먼트 개수 확인
+db.numbers.countDocuments()
+
+// 큰 값 검색 ($gt: greater than)
+db.numbers.find({num: {"$gt": 199995}})
+
+// 범위 검색 ($gt, $lt)
+db.numbers.find({num: {"$gt": 20, "$lt": 25}})
+
+// 쿼리 실행 계획 확인
+db.numbers.find({num: {"$gt": 199995}}).explain("executionStats")
+
+
+
+// === 인덱스 생성 ===
+// 신 버전 (MongoDB 3.0+) - 권장
+db.numbers.createIndex({num: 1})
+
+// === 인덱스 확인 ===
+db.numbers.getIndexes()  // 버전 무관
+
+// === 복합 인덱스 생성 (신버전 예시) ===
+db.users.createIndex({username: 1, age: -1})  // username 오름차순, age 내림차순
+
+// === 인덱스 옵션 활용 ===
+db.users.createIndex(
+    {email: 1},
+    {unique: true, sparse: true}  // 유니크 인덱스, null 값 제외
+)
+
+// 인덱스 적용 후 explain() 결과
+db.numbers.find({num: {"$gt": 199995}}).explain("executionStats")
+
+
+
+
+
+// 데이터베이스 목록 보기
+show dbs
+
+// 현재 데이터베이스의 컬렉션 목록 보기
+show collections
+
+// 신 버전 (MongoDB 4.4+) - 더 자세한 정보
+db.runCommand({dbStats: 1})
+db.runCommand({collStats: "numbers"})
+
+db.stats()
+
+// === 연결 상태 확인 ===
+db.hello()  // MongoDB 5.0+
+
+
+
+// ---------------------------------------
+// ================================
+// MongoDB 쿼리 실습용 샘플 데이터 생성 (카테고리별 10개 상품)
+// ================================
+
+use tutorial2
+db.dropDatabase()
+
+
+// === 1. 기존 데이터 정리 ===
+db.categories.deleteMany({})
+db.products.deleteMany({})
+db.users.deleteMany({})
+db.reviews.deleteMany({})
+
+console.log("=== 기존 데이터 정리 완료 ===")
+
+// === 2. 카테고리 데이터 (5개, 평면 구조) ===
+const categories = [
+    {
+        _id: ObjectId("6a5b1476238d3b4dd5000001"),
+        name: "Electronics",
+        slug: "electronics",
+        description: "Electronic devices and accessories"
+    },
+    {
+        _id: ObjectId("6a5b1476238d3b4dd5000002"),
+        name: "Garden & Outdoor",
+        slug: "outdoors",
+        description: "Everything for your garden and outdoor activities"
+    },
+    {
+        _id: ObjectId("6a5b1476238d3b4dd5000003"),
+        name: "Tools & Hardware",
+        slug: "tools",
+        description: "Tools and hardware for all your projects"
+    },
+    {
+        _id: ObjectId("6a5b1476238d3b4dd5000004"),
+        name: "Home & Kitchen",
+        slug: "home",
+        description: "Home and kitchen essentials"
+    },
+    {
+        _id: ObjectId("6a5b1476238d3b4dd5000005"),
+        name: "Sports & Fitness",
+        slug: "sports",
+        description: "Sports equipment and fitness gear"
+    }
+]
+
+db.categories.insertMany(categories)
+console.log(`=== 카테고리 ${categories.length}개 생성 완료 ===`)
+
+// === 3. 사용자 데이터 (100명) ===
+const users = []
+const firstNames = ["John", "Jane", "Mike", "Sarah", "David", "Lisa", "Tom", "Emma", "Chris", "Anna",
+    "Mark", "Kelly", "Steve", "Amy", "Brian", "Jessica", "Ryan", "Michelle", "Kevin", "Laura"]
+const lastNames = ["Smith", "Johnson", "Brown", "Davis", "Wilson", "Garcia", "Miller", "Taylor", "Anderson", "Jackson",
+    "White", "Harris", "Martin", "Thompson", "Martinez", "Robinson", "Clark", "Rodriguez", "Lewis", "Lee"]
+const states = ["NY", "CA", "TX", "FL", "IL", "PA", "OH", "GA", "NC", "MI"]
+const cities = ["New York", "Los Angeles", "Chicago", "Houston", "Phoenix", "Philadelphia", "San Antonio", "San Diego", "Dallas", "San Jose"]
+
+for(let i = 1; i <= 100; i++) {
+    const firstName = firstNames[Math.floor(Math.random() * firstNames.length)]
+    const lastName = lastNames[Math.floor(Math.random() * lastNames.length)]
+
+    users.push({
+        _id: ObjectId(),
+        username: `user${i}`,
+        first_name: firstName,
+        last_name: lastName,
+        birth_year: 1970 + Math.floor(Math.random() * 35), // 1970-2004
+        email: `${firstName.toLowerCase()}.${lastName.toLowerCase()}${i}@example.com`,
+        addresses: [
+            {
+                name: "home",
+                street: `${100 + Math.floor(Math.random() * 900)} Main Street`,
+                city: cities[Math.floor(Math.random() * cities.length)],
+                state: states[Math.floor(Math.random() * states.length)],
+                zip: 10000 + Math.floor(Math.random() * 80000)
+            }
+        ]
+    })
+}
+
+db.users.insertMany(users)
+console.log(`=== 사용자 ${users.length}명 생성 완료 ===`)
+
+// === 4. 상품 데이터 (카테고리별 10개씩 = 총 50개) ===
+const products = []
+const colors = ["red", "blue", "green", "black", "white", "gray", "yellow", "orange", "purple", "brown"]
+const manufacturers = ["ACME", "ProTools", "GardenMax", "TechCorp", "HomeStyle", "SportsPro", "QualityBrand", "SuperMax"]
+const baseTags = ["popular", "sale", "new", "premium", "basic", "professional", "portable", "durable"]
+
+// 카테고리별 상품 템플릿 (10개씩)
+const productTemplates = {
+    "Electronics": [
+        "Laptop", "Smartphone", "Tablet", "Smart Watch", "Wireless Headphones",
+        "Gaming Console", "Digital Camera", "Bluetooth Speaker", "Smart TV", "Drone"
+    ],
+    "Garden & Outdoor": [
+        "Wheel Barrow", "Garden Hose", "Pruning Shears", "Lawn Mower", "Fertilizer Spreader",
+        "Garden Rake", "Watering Can", "Plant Pots", "Garden Gloves", "Outdoor Umbrella"
+    ],
+    "Tools & Hardware": [
+        "Power Drill", "Hammer Set", "Screwdriver Kit", "Circular Saw", "Tool Box",
+        "Measuring Tape", "Level Tool", "Wrench Set", "Pliers Set", "Safety Goggles"
+    ],
+    "Home & Kitchen": [
+        "Blender", "Coffee Maker", "Non-stick Pan", "Rice Cooker", "Air Fryer",
+        "Kitchen Scale", "Cutting Board", "Knife Set", "Mixing Bowls", "Food Processor"
+    ],
+    "Sports & Fitness": [
+        "Yoga Mat", "Dumbbell Set", "Running Shoes", "Treadmill", "Exercise Bike",
+        "Resistance Bands", "Medicine Ball", "Jump Rope", "Foam Roller", "Gym Bag"
+    ]
+}
+
+let productCounter = 1
+
+categories.forEach(category => {
+    const categoryProducts = productTemplates[category.name]
+
+    console.log(`=== ${category.name} 카테고리에 상품 10개 생성 중... ===`)
+
+    categoryProducts.forEach((productName, index) => {
+        // 일부 상품은 color 필드 없음 ($exists 테스트용)
+        const details = {
+            manufacturer: manufacturers[Math.floor(Math.random() * manufacturers.length)],
+            weight: `${1 + Math.floor(Math.random() * 20)} lbs`,
+            material: ["steel", "plastic", "aluminum", "wood", "rubber"][Math.floor(Math.random() * 5)]
+        }
+
+        // 80% 확률로 color 필드 추가
+        if(Math.random() > 0.2) {
+            details.color = colors[Math.floor(Math.random() * colors.length)]
+        }
+
+        // 카테고리별 특별 태그 추가
+        const categoryTags = {
+            "Electronics": ["tech", "digital", "smart"],
+            "Garden & Outdoor": ["gardening", "outdoor", "soil"],
+            "Tools & Hardware": ["tools", "construction", "DIY"],
+            "Home & Kitchen": ["kitchen", "cooking", "home"],
+            "Sports & Fitness": ["fitness", "exercise", "sport"]
+        }
+
+        const tags = [
+            baseTags[Math.floor(Math.random() * baseTags.length)], // 랜덤 기본 태그 1개
+            baseTags[Math.floor(Math.random() * baseTags.length)], // 랜덤 기본 태그 1개 (중복 가능)
+            ...categoryTags[category.name] // 카테고리별 태그 3개
+        ]
+
+        products.push({
+            _id: ObjectId(),
+            name: `${productName} Pro ${productCounter}`,
+            slug: `${productName.toLowerCase().replace(/\s+/g, '-')}-${productCounter}`,
+            sku: `SKU${productCounter.toString().padStart(4, '0')}`,
+            main_cat_id: category._id,
+            category_id: category._id,
+            price: Math.round((20 + Math.random() * 480) * 100) / 100, // $20-$500
+            description: `Professional grade ${productName.toLowerCase()} with premium features and reliable performance. Perfect for both beginners and professionals.`,
+            tags: [...new Set(tags)], // 중복 제거
+            details: details,
+            helpful_votes: Math.floor(Math.random() * 300),
+            total_reviews: 0, // 나중에 실제 리뷰 개수로 업데이트
+            average_rating: 0, // 나중에 실제 평균으로 계산
+            in_stock: Math.random() > 0.1, // 90% 재고 있음
+            inventory_count: Math.floor(Math.random() * 100) + 10,
+            created_at: new Date(2024, Math.floor(Math.random() * 4), Math.floor(Math.random() * 28) + 1) // 2024년 1-4월
+        })
+
+        productCounter++
+    })
+})
+
+db.products.insertMany(products)
+console.log(`=== 상품 ${products.length}개 생성 완료 (카테고리별 10개씩) ===`)
+
+// === 5. 리뷰 데이터 (상품별 20-50개) ===
+const reviews = []
+const reviewTitles = [
+    // 긍정적 리뷰 (5점)
+    "Amazing product!", "Love it!", "Excellent quality", "Great value for money", "Highly recommend",
+    "Perfect for my needs", "Outstanding performance", "Very satisfied", "Fantastic buy", "Exceeded expectations",
+    "Top quality", "Works perfectly", "Great design", "Super fast delivery", "Professional grade",
+
+    // 좋은 리뷰 (4점)
+    "Good product", "Pretty good", "Nice quality", "Satisfied with purchase", "Works well",
+    "Good value", "Solid product", "Does what it should", "Happy with it", "Reliable",
+
+    // 보통 리뷰 (3점)
+    "Average quality", "Decent for the price", "Not bad", "Acceptable quality", "Fair product",
+    "Standard features", "Basic but functional", "Okay purchase", "Middle of the road", "Adequate",
+
+    // 나쁜 리뷰 (2점)
+    "Could be better", "Disappointing", "Not great", "Had some issues", "Below expectations",
+    "Mediocre quality", "Some problems", "Not impressed", "Needs improvement", "Questionable quality",
+
+    // 매우 나쁜 리뷰 (1점)
+    "Poor quality", "Not worth it", "Broke quickly", "Not as described", "Waste of money",
+    "Cheap materials", "Terrible experience", "Complete failure", "Awful product", "Total disappointment"
+]
+
+const reviewComments = [
+    // 5점 댓글
+    "This product exceeded my expectations in every way. The build quality is superb and it performs exactly as advertised. Definitely worth every penny!",
+    "Excellent value for the money. Fast shipping and great customer service. Would definitely buy again and recommend to friends.",
+    "Perfect size and fits exactly what I needed. The design is sleek and modern. Installation was a breeze. Highly recommend to others!",
+
+    // 4점 댓글
+    "Good quality product that does what it's supposed to do. Installation was straightforward and hassle-free. Minor issues but overall satisfied.",
+    "Works well for my needs. The price point is reasonable for what you get. Good customer service when I had questions.",
+    "Solid build quality and performs as expected. A few minor flaws but nothing major. Would consider buying again.",
+
+    // 3점 댓글
+    "Average product with standard features. Nothing special but gets the job done adequately. Price is fair for what you receive.",
+    "Decent product for the price range. Has some limitations but works for basic needs. Customer service was helpful when contacted.",
+    "Not bad but not great either. Does what it's supposed to do but lacks some features I was hoping for. Acceptable overall.",
+
+    // 2점 댓글
+    "Quality could be better for this price range. Had some minor issues that were annoying. Customer service tried to help but problems persist.",
+    "Not quite what I expected from the description. The materials feel cheaper than advertised. Works but not impressive.",
+    "Had several issues right out of the box. Some features don't work as described. Considering returning it.",
+
+    // 1점 댓글
+    "Disappointed with the build quality. Broke after just a few uses despite careful handling. Would not recommend to others at all.",
+    "Complete waste of money. Poor construction and terrible performance. Multiple defects noticed immediately. Returned for refund.",
+    "Terrible experience from start to finish. Product arrived damaged and replacement had same issues. Save your money and buy elsewhere."
+]
+
+let totalReviews = 0
+
+products.forEach((product, productIndex) => {
+    const reviewCount = 20 + Math.floor(Math.random() * 31) // 20-50개
+    const productReviews = []
+
+    console.log(`📝 ${product.name}에 리뷰 ${reviewCount}개 생성 중... (${productIndex + 1}/${products.length})`)
+
+    for(let i = 0; i < reviewCount; i++) {
+        const user = users[Math.floor(Math.random() * users.length)]
+
+        // 더 현실적인 평점 분포 (높은 평점에 가중치)
+        const randomValue = Math.random()
+        let rating
+        if(randomValue < 0.4) rating = 5      // 40% - 5점
+        else if(randomValue < 0.7) rating = 4 // 30% - 4점
+        else if(randomValue < 0.85) rating = 3 // 15% - 3점
+        else if(randomValue < 0.95) rating = 2 // 10% - 2점
+        else rating = 1                       // 5% - 1점
+
+        // 평점에 따른 제목과 댓글 선택
+        const titleStartIndex = (rating - 1) * 10
+        const commentIndex = (rating - 1) * 3 + Math.floor(Math.random() * 3)
+
+        const review = {
+            _id: ObjectId(),
+            product_id: product._id,
+            user_id: user._id,
+            rating: rating,
+            title: reviewTitles[titleStartIndex + Math.floor(Math.random() * 10)],
+            comment: reviewComments[commentIndex],
+            helpful_votes: Math.floor(Math.random() * 50),
+            verified_purchase: Math.random() > 0.25, // 75% 인증된 구매
+            created_at: new Date(2024, Math.floor(Math.random() * 5), Math.floor(Math.random() * 28) + 1) // 2024년 1-5월
+        }
+
+        productReviews.push(review)
+        reviews.push(review)
+    }
+
+    // 상품의 총 리뷰 수와 평균 평점 계산
+    const avgRating = productReviews.reduce((sum, r) => sum + r.rating, 0) / productReviews.length
+
+    // 상품 정보 업데이트
+    db.products.updateOne(
+        {_id: product._id},
+        {
+            $set: {
+                total_reviews: reviewCount,
+                average_rating: Math.round(avgRating * 10) / 10
+            }
+        }
+    )
+
+    totalReviews += reviewCount
+})
+
+// 배치로 리뷰 삽입 (성능 최적화)
+const batchSize = 500
+for(let i = 0; i < reviews.length; i += batchSize) {
+    const batch = reviews.slice(i, i + batchSize)
+    db.reviews.insertMany(batch)
+    console.log(`=== 리뷰 배치 ${Math.floor(i/batchSize) + 1} 삽입 완료 (${batch.length}개) ===`)
+}
+
+console.log(`=== 리뷰 ${reviews.length}개 생성 완료 (상품별 20-50개) ===`)
+
+// === 6. 성능 최적화 인덱스 생성 ===
+// Products 인덱스
+db.products.createIndex({main_cat_id: 1})
+db.products.createIndex({category_id: 1})
+db.products.createIndex({slug: 1}, {unique: true})
+db.products.createIndex({tags: 1})
+db.products.createIndex({helpful_votes: -1})
+db.products.createIndex({"details.color": 1})
+db.products.createIndex({"details.manufacturer": 1})
+db.products.createIndex({price: 1})
+db.products.createIndex({average_rating: -1})
+
+// Reviews 인덱스
+db.reviews.createIndex({product_id: 1})
+db.reviews.createIndex({product_id: 1, helpful_votes: -1})
+db.reviews.createIndex({user_id: 1})
+db.reviews.createIndex({rating: 1})
+db.reviews.createIndex({created_at: -1})
+
+// Categories 인덱스
+db.categories.createIndex({slug: 1}, {unique: true})
+
+// Users 인덱스
+db.users.createIndex({username: 1}, {unique: true})
+db.users.createIndex({birth_year: 1})
+db.users.createIndex({"addresses.state": 1})
+
+console.log("=== 인덱스 생성 완료 ===")
+
+
+
+// === 상품 정보 조회 ===
+db.products.find()
+product = db.products.findOne({'slug': 'laptop-1'})
+console.log(product)
+
+// === 연관 데이터 조회 ===
+// 해당 상품의 카테고리 정보
+db.categories.findOne({'_id': product['main_cat_id']})
+
+
+// 해당 상품의 리뷰 목록
+db.reviews.find({'product_id': product['_id']})
+
+
+
+
+
+
+// === 기본 페이지네이션 ===
+product = db.products.findOne({'slug': 'laptop-1'})
+console.log(product)
+
+
+// 첫 번째 페이지 (0-11번째 리뷰)
+db.reviews.find({'product_id': product['_id']})
+db.reviews.countDocuments({'product_id': product['_id']})
+
+
+db.reviews.find({'product_id': product['_id']})
+    .skip(0)
+    .limit(12)
+    .sort({'helpful_votes': -1})
+
+
+// === 완전한 페이지네이션 시스템 ===
+page_number = 1  // 현재 페이지 번호
+page_size = 12   // 페이지당 항목 수
+
+product = db.products.findOne({'slug': 'laptop-1'})
+
+// 전체 리뷰 개수 (신 버전 - MongoDB 4.0+)
+reviews_count = db.reviews.countDocuments({'product_id': product['_id']})
+
+
+// 페이지네이션된 리뷰 조회
+reviews = db.reviews.find({'product_id': product['_id']})
+    .skip((page_number - 1) * page_size)
+    .limit(page_size)
+    .sort({'helpful_votes': -1})
+
+
+
+// === 카테고리별 상품 리스트 ===
+
+db.categories.find()
+
+category = db.categories.findOne({'slug': 'electronics'})
+
+console.log(category)
+
+// 해당 카테고리 상품 목록 + 페이지네이션(5개당 1페이지)
+db.products.find({'category_id': category['_id']})
+page_number = 1
+page_size = 5
+products = db.products.find({'category_id': category['_id']})
+    .skip((page_number - 1) * page_size)
+    .limit(page_size)
+    .sort({'helpful_votes': -1})
+
+
+// 데이터 타입별 쿼리
+db.items.insertMany([
+    { "_id" : ObjectId("4caf82011b0978483ea29ada"), "value" : 97 },
+    { "_id" : ObjectId("4caf82031b0978483ea29adb"), "value" : 98 },
+    { "_id" : ObjectId("4caf82051b0978483ea29adc"), "value" : 99 },
+    { "_id" : ObjectId("4caf820d1b0978483ea29ade"), "value" : "a" },
+    { "_id" : ObjectId("4caf820f1b0978483ea29adf"), "value" : "b" },
+    { "_id" : ObjectId("4caf82101b0978483ea29ae0"), "value" : "c" }
+])
+
+// === 타입별 범위 검색 ===
+// 정수 범위 검색 (숫자 데이터만 반환)
+db.items.find({'value': {'$gte': 97}})
+
+// 문자열 범위 검색 (문자열 데이터만 반환)
+db.items.find({'value': {'$gte': "a"}})
+
+
+// === 다중 상품 검색 ===
+db.products.find()
+db.products.find({
+    'slug': {
+        '$in': [
+            'laptop-1',
+            'smartphone-2',
+            'tablet-3'
+        ]
+    }
+})
+
+
+// === OR 조건 (색상 또는 제조사로 검색) ===
+db.products.find({
+    '$or': [
+        {'details.color': 'blue'},
+        {'details.manufacturer': 'ACME'}
+    ]
+})
+
+// === 복합 태그 검색 (두 태그 그룹 모두 포함) ===
+db.products.find({
+    $and: [
+        {tags: {$in: ['new', 'basic']}},
+        {tags: {$in: ['tech', 'digital']}}
+    ]
+})
+
+// === 필드 존재 여부 확인 ===
+// 색상 정보가 없는 상품
+db.products.find({'details.color': {$exists: false}})
+db.products.countDocuments({'details.color': {$exists: false}})
+
+// 색상 정보가 있는 상품
+db.products.find({'details.color': {$exists: true}})
+db.products.countDocuments({'details.color': {$exists: true}})
+
+
+
+
+
+// === 배열 요소 검색 ===
+// 배열에 "premium" 포함된 모든 문서
+db.products.find({tags: "premium"})
+
+// 첫 번째 태그가 "soil"인 문서만
+db.products.find({'tags.0': "premium"})
+
+
+
+// === 인덱스 기반 검색 ===
+// 첫 번째 주소의 주(state) 검색
+db.users.find({'addresses.0.state': "NY"})
+
+// === 전체 배열 검색 ===
+// 모든 주소 중 NY가 있는 사용자
+db.users.find({'addresses.state': "NY"})
+
+// === 다중 조건 검색 ($elemMatch 사용) ===
+// 같은 배열 요소 내에서 모든 조건이 만족되어야 함
+db.users.find({
+    'addresses': {
+        '$elemMatch': {
+            'city': 'San Antonio',
+            'state': 'NY'
+        }
+    }
+})
